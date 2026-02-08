@@ -1,0 +1,5 @@
+{
+  "name": "Validador de Retorno ao Curso",
+  "description": "Sistema para validar a elegibilidade de alunos para a modalidade de Retorno ao Curso com base em regras de negócio acadêmicas.",
+  "requestFramePermissions": []
+}
