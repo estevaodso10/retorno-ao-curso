@@ -34,22 +34,40 @@ export const formatSemester = (sem: Semester): string => {
 };
 
 /**
+ * Calculates the next semester logically.
+ */
+const getNextSemester = (sem: Semester): Semester => {
+  if (sem.period === 2) {
+    return { year: sem.year + 1, period: 1 };
+  }
+  return { year: sem.year, period: 2 };
+};
+
+/**
+ * Calculates the previous semester logically.
+ */
+const getPreviousSemester = (sem: Semester): Semester => {
+  if (sem.period === 1) {
+    return { year: sem.year - 1, period: 2 };
+  }
+  return { year: sem.year, period: 1 };
+};
+
+/**
  * Calculates the number of semesters BETWEEN two semesters.
- * The Start and End semesters themselves are excluded from the gap count 
- * based on the business rule provided (current semester doesn't count in calculation).
+ * The Start and End semesters themselves are excluded from the gap count.
  * 
  * Logic:
  * Start: 2024.1 (Index 4048)
  * End:   2026.1 (Index 4052)
  * Diff:  4052 - 4048 - 1 = 3 semesters gap (2024.2, 2025.1, 2025.2).
+ * 
+ * Returns negative values if end <= start, allowing validation of date order.
  */
 export const calculateGap = (start: Semester, end: Semester): number => {
   const startIndex = getSemesterIndex(start);
   const endIndex = getSemesterIndex(end);
   
-  // If end is before or same as start, gap is 0 (or technically negative/invalid for this context)
-  if (endIndex <= startIndex) return 0;
-
   return endIndex - startIndex - 1;
 };
 
@@ -57,12 +75,20 @@ export const calculateGap = (start: Semester, end: Semester): number => {
  * Main Business Rule Validator
  */
 export const analyzeEligibility = (input: AnalysisInput): AnalysisResult => {
+  const nextSemester = getNextSemester(input.lastActiveSemester);
+  const prevSemester = getPreviousSemester(input.currentSemester);
+  
+  const startCountStr = formatSemester(nextSemester);
+  const endCountStr = formatSemester(prevSemester);
+
   // Rule 1: Status Cancelada
   if (input.isCancelled) {
     return {
       isEligible: false,
       justification: "A matrícula atual consta como 'Cancelada'. Situações de cancelamento impedem o enquadramento direto em retorno ao curso.",
-      gapSemesters: 0
+      gapSemesters: 0,
+      gapIntervalStart: startCountStr,
+      gapIntervalEnd: endCountStr
     };
   }
 
@@ -71,34 +97,46 @@ export const analyzeEligibility = (input: AnalysisInput): AnalysisResult => {
     return {
       isEligible: false,
       justification: "O retorno não é para o mesmo curso. O enquadramento exige que o aluno retorne à mesma graduação de origem.",
-      gapSemesters: 0
+      gapSemesters: 0,
+      gapIntervalStart: startCountStr,
+      gapIntervalEnd: endCountStr
     };
   }
 
   // Rule 3: Time Calculation
   const gap = calculateGap(input.lastActiveSemester, input.currentSemester);
-  const MAX_GAP = 4;
-
-  if (gap > MAX_GAP) {
-    return {
-      isEligible: false,
-      justification: `O período de afastamento foi de ${gap} semestres letivos, excedendo o limite máximo permitido de ${MAX_GAP} semestres.`,
-      gapSemesters: gap
-    };
-  }
+  const LIMIT_GAP = 4; 
 
   if (gap < 0) {
      return {
-      isEligible: false, // Logical error in input, safer to say not eligible or handle error
-      justification: "Data do semestre atual é anterior ao último vínculo. Verifique as datas inseridas.",
-      gapSemesters: gap
+      isEligible: false, 
+      justification: "Data do semestre atual deve ser posterior ao último vínculo. Verifique as datas inseridas.",
+      gapSemesters: gap,
+      gapIntervalStart: startCountStr,
+      gapIntervalEnd: endCountStr
+    };
+  }
+
+  const rangeText = gap > 0 ? `(de ${startCountStr} a ${endCountStr})` : `(sem intervalo entre os semestres)`;
+
+  // Rule: Gap must be strictly less than 4 (gap < 4 is eligible).
+  // Therefore, gap >= 4 is ineligible.
+  if (gap >= LIMIT_GAP) {
+    return {
+      isEligible: false,
+      justification: `A soma de períodos letivos entre o último vínculo e o retorno é de ${gap} semestre(s) ${rangeText}.`,
+      gapSemesters: gap,
+      gapIntervalStart: startCountStr,
+      gapIntervalEnd: endCountStr
     };
   }
 
   // All rules passed
   return {
     isEligible: true,
-    justification: `Critérios atendidos: O afastamento foi de ${gap} semestre(s) (limite: ${MAX_GAP}), matrícula não está cancelada e o curso é o mesmo.`,
-    gapSemesters: gap
+    justification: `Critérios atendidos: A soma de períodos letivos entre o último vínculo e o retorno é de ${gap} semestre(s) ${rangeText}, o que é menor que ${LIMIT_GAP}. Matrícula não está cancelada e o curso é o mesmo.`,
+    gapSemesters: gap,
+    gapIntervalStart: startCountStr,
+    gapIntervalEnd: endCountStr
   };
 };

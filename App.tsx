@@ -249,7 +249,7 @@ const App: React.FC = () => {
                   <h3 className={`text-xl font-bold mb-2 ${
                     result.isEligible ? 'text-green-800' : 'text-red-800'
                   }`}>
-                    {result.isEligible ? 'SE ENQUADRA' : 'NÃO SE ENQUADRA'}
+                    {result.isEligible ? 'É RETORNO AO CURSO' : 'NÃO É RETORNO AO CURSO'}
                   </h3>
                   
                   <div className={`prose prose-sm max-w-none ${
@@ -273,10 +273,9 @@ const App: React.FC = () => {
                         </li>
                         <li>
                           <strong>Intervalo de Afastamento:</strong> {result.gapSemesters} Semestres
-                          <span className="text-xs opacity-70 ml-2">(Máximo permitido: 4)</span>
                         </li>
                         <li>
-                          <strong>Período:</strong> {lastSemStr} <span className="opacity-50 mx-1">➜</span> {currentSemStr}
+                          <strong>Período:</strong> {result.gapIntervalStart} <span className="opacity-50 mx-1">➜</span> {result.gapIntervalEnd}
                         </li>
                       </ul>
                     </div>
